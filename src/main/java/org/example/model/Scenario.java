@@ -12,6 +12,11 @@ public class Scenario {
         this.description = description;
         this.choices = choices;
     }
+    public Scenario(String id, String description) {
+        this.id = id;
+        this.description = description;
+        this.choices = null;
+    }
 
     public String getId() { return id; }
     public String getDescription() { return description; }

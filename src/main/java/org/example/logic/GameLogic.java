@@ -3,6 +3,7 @@ package org.example.logic;
 import org.example.model.*;
 import java.util.*;
 
+
 public class GameLogic {
     private final ScenarioGen scenarioGenerator;
     private String currentScenarioId;
@@ -21,6 +22,9 @@ public class GameLogic {
     public GameResponse processInput(String playerId, String input) {
         if ("help".equalsIgnoreCase(input)) {
             return getHelpResponse();
+        }
+        if (currentScenarioId == "end"){
+            return endOfGame();
         }
 
         Player player = players.get(playerId);
@@ -74,6 +78,10 @@ public class GameLogic {
                 "- 'help' - показать это сообщение\n" +
                 "- 'status' - показать статус персонажа";
         return new GameResponse(helpText, null, true, null);
+    }
+    private GameResponse endOfGame() {
+        String endText = "Тут пока ничего нет :(. Введи exit \n";
+        return new GameResponse(endText, null, true, null);
     }
 
     public GameResponse startGame(String playerId) {

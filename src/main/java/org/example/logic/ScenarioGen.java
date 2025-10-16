@@ -17,19 +17,21 @@ public class ScenarioGen {
         List<Choice> startChoices = Arrays.asList(
                 new Choice("Исследовать лес", "forest", null),
                 new Choice("Пойти в город", "city", null),
-                new Choice("Проверить снаряжение", "inventory", null)
+                new Choice("Проверить снаряжение", "end", null)
         );
         scenarios.put("start", new Scenario("start",
                 "Вы стоите на перепутье. Перед вами три пути...", startChoices));
 
 
         List<Choice> forestChoices = Arrays.asList(
-                new Choice("Вариант 1", "v1", "hp-15"),
-                new Choice("Вариант 2", "v2", null),
-                new Choice("Вариант 3", "v3", "stealth-check")
+                new Choice("Вариант 1", "end", "hp-15"),
+                new Choice("Вариант 2", "end", null),
+                new Choice("Вариант 3", "end", "stealth-check")
         );
         scenarios.put("forest", new Scenario("forest",
                 "forest работает успешно!", forestChoices));
+        scenarios.put("inventory", new Scenario("end", "Тут пока ничего нет :("));
+        scenarios.put("end", new Scenario("end", ""));
     }
 
     public Scenario getScenario(String scenarioId) {

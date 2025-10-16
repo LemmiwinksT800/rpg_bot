@@ -52,10 +52,7 @@ out/
 *.iml
 *.iws
 *.ipr
-<<<<<<< HEAD
 .gigaide/
-=======
->>>>>>> e1f310db1deb9fff261c12690aa3389cef6cda09
 
 # System
 .DS_Store

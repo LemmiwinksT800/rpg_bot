@@ -24,14 +24,18 @@ public class ScenarioGen {
 
 
         List<Choice> forestChoices = Arrays.asList(
-                new Choice("Вариант 1", "end", "hp-15"),
-                new Choice("Вариант 2", "end", null),
-                new Choice("Вариант 3", "end", "stealth-check")
+                new Choice("Атаковать волка", "end", "hp-15"),
+                new Choice("Убежать", "start", "check:stealth:12"),
+                new Choice("Использовать зелье", "forest_healed", "add:health_potion")
         );
+
         scenarios.put("forest", new Scenario("forest",
-                "forest работает успешно!", forestChoices));
-        scenarios.put("inventory", new Scenario("end", "Тут пока ничего нет :("));
-        scenarios.put("end", new Scenario("end", ""));
+                "Вы встретили голодного волка! Он рычит и готовится к прыжку...", forestChoices));
+
+        scenarios.put("forest_healed", new Scenario("forest_healed",
+                "Вы выпили зелье и чувствуете прилив сил! Волк убегает.",
+                List.of(new Choice("Вернуться на развилку", "start", null))));
+
     }
 
     public Scenario getScenario(String scenarioId) {

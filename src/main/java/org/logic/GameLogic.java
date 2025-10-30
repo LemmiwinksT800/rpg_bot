@@ -1,13 +1,8 @@
 package org.logic;
 
 import org.model.*;
-import org.model.Choice;
-import org.model.GameResponse;
-import org.model.Player;
-import org.model.Scenario;
 
 import java.util.*;
-
 
 public class GameLogic {
     private final ScenarioGen scenarioGenerator;
@@ -24,77 +19,108 @@ public class GameLogic {
         players.put(playerId, new Player(playerName));
     }
 
+    public GameResponse startGame(String playerId) {
+        Player player = players.get(playerId);
+        Scenario start = scenarioGenerator.getScenario("start");
+        return buildResponse(start, player, "Игра началась!");
+    }
+
     public GameResponse processInput(String playerId, String input) {
-        if ("help".equalsIgnoreCase(input)) {
-            return getHelpResponse();
+        Player player = players.get(playerId);
+        if (player == null) return new GameResponse("Игрок не найден.", null, false, null);
+
+        if (!player.isAlive()) {
+            return new GameResponse("Вы мертвы. Игра окончена.", null, false, null);
         }
-        if (currentScenarioId == "end"){
+
+        // Обработка команд
+        if ("help".equalsIgnoreCase(input)) return getHelpResponse();
+        if ("status".equalsIgnoreCase(input)) return getStatusResponse(player);
+        if ("inventory".equalsIgnoreCase(input)) return getInventoryResponse(player);
+        if ("exit".equalsIgnoreCase(input)) return new GameResponse("Выход...", null, true, null);
+
+        Scenario current = scenarioGenerator.getScenario(currentScenarioId);
+        if (current == null || current.getChoices() == null) {
             return endOfGame();
         }
 
-        Player player = players.get(playerId);
-        Scenario currentScenario = scenarioGenerator.getScenario(currentScenarioId);
-
         try {
-            int choiceIndex = Integer.parseInt(input) - 1;
-            if (choiceIndex >= 0 && choiceIndex < currentScenario.getChoices().size()) {
-                Choice choice = currentScenario.getChoices().get(choiceIndex);
-                applyChoiceEffects(player, choice);
-                currentScenarioId = choice.getNextScenarioId();
-
-                Scenario nextScenario = scenarioGenerator.getScenario(currentScenarioId);
-                return new GameResponse(nextScenario.getDescription(),
-                        nextScenario.getChoices(),
-                        true,
-                        getPlayerStatus(player));
-            } else {
-                return new GameResponse("Неверный выбор. Попробуйте снова.",
-                        currentScenario.getChoices(),
-                        false,
-                        getPlayerStatus(player));
+            int choiceIdx = Integer.parseInt(input) - 1;
+            if (choiceIdx < 0 || choiceIdx >= current.getChoices().size()) {
+                return buildResponse(current, player, "Неверный выбор.");
             }
+
+            Choice choice = current.getChoices().get(choiceIdx);
+            applyEffect(player, choice.getEffect());
+
+            if (!player.isAlive()) {
+                return new GameResponse("Вы умерли от полученных ран...", null, false, null);
+            }
+
+            currentScenarioId = choice.getNextScenarioId();
+            Scenario next = scenarioGenerator.getScenario(currentScenarioId);
+
+            String message = next != null ? next.getDescription() : "Конец пути...";
+            return buildResponse(next, player, message);
+
         } catch (NumberFormatException e) {
-            return new GameResponse("Пожалуйста, введите номер выбора.",
-                    currentScenario.getChoices(),
-                    false,
-                    getPlayerStatus(player));
+            return buildResponse(current, player, "Введите номер варианта.");
         }
     }
 
-    private void applyChoiceEffects(Player player, Choice choice) {
-        if (choice.getEffect() != null) {
-            // Простая обработка эффектов
-            if (choice.getEffect().startsWith("hp-")) {
-                int damage = Integer.parseInt(choice.getEffect().substring(3));
-                player.setHealth(player.getHealth() - damage);
+    private void applyEffect(Player player, Effect effect) {
+        if (effect == null) return;
+
+        switch (effect.getType()) {
+            case DAMAGE -> player.damage(effect.getValue());
+            case HEAL -> player.heal(effect.getValue());
+            case ADD_ITEM -> Item.predefinedItems().stream()
+                    .filter(i -> i.getId().equals(effect.getTarget()))
+                    .findFirst()
+                    .ifPresent(player::addItem);
+            case CHECK_STAT -> {
+                int required = effect.getValue();
+                int playerStat = player.getStats().getOrDefault(effect.getTarget(), 0);
+                if (playerStat < required) {
+                    player.damage(20); // провал проверки
+                }
             }
-            // Можно добавить другие эффекты
         }
     }
 
-    private String getPlayerStatus(Player player) {
-        return player.getStatus();
+    private GameResponse buildResponse(Scenario scenario, Player player, String overrideMessage) {
+        String message = overrideMessage != null ? overrideMessage : (scenario != null ? scenario.getDescription() : "");
+        List<Choice> choices = scenario != null ? scenario.getChoices() : null;
+        return new GameResponse(message, choices, true, player.getStatus());
     }
 
     private GameResponse getHelpResponse() {
-        String helpText = "Добро пожаловать в RPG бота, Герой!\n" +
-                "Команды:\n" +
-                "- Вводите цифры для выбора действий\n" +
-                "- 'help' - показать это сообщение\n" +
-                "- 'status' - показать статус персонажа";
-        return new GameResponse(helpText, null, true, null);
-    }
-    private GameResponse endOfGame() {
-        String endText = "Тут пока ничего нет :(. Введи exit \n";
-        return new GameResponse(endText, null, true, null);
+        String help = """
+                Команды:
+                • номер — выбрать действие
+                • help — справка
+                • status — статус героя
+                • inventory — инвентарь
+                • exit — выход
+                """;
+        return new GameResponse(help, null, true, null);
     }
 
-    public GameResponse startGame(String playerId) {
-        Scenario startScenario = scenarioGenerator.getScenario("start");
-        Player player = players.get(playerId);
-        return new GameResponse(startScenario.getDescription(),
-                startScenario.getChoices(),
-                true,
-                getPlayerStatus(player));
+    private GameResponse getStatusResponse(Player player) {
+        return new GameResponse("Ваш статус:\n" + player.getStatus(), null, true, null);
+    }
+
+    private GameResponse getInventoryResponse(Player player) {
+        if (player.getInventory().isEmpty()) {
+            return new GameResponse("Инвентарь пуст.", null, true, null);
+        }
+        String items = player.getInventory().stream()
+                .map(i -> "- " + i.toString())
+                .collect(java.util.stream.Collectors.joining("\n"));
+        return new GameResponse("Ваш инвентарь:\n" + items, null, true, null);
+    }
+
+    private GameResponse endOfGame() {
+        return new GameResponse("Приключение окончено. Введите 'exit'.", null, true, null);
     }
 }

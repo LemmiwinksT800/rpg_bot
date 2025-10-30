@@ -1,5 +1,7 @@
 package org.model;
 
+import java.util.List;
+
 public class Item {
     private final String id;
     private final String name;
@@ -46,5 +48,13 @@ public class Item {
     public static Item createShield() {
         return new Item("shield", "Деревянный щит", "Простой деревянный щит",
                 ItemType.ARMOR, 30, "defense:5");
+    }
+    public static List<Item> predefinedItems() {
+        return List.of(
+                createHealthPotion(),
+                createSword(),
+                createShield(),
+                new Item("key", "Ржавый ключ", "Открывает старую дверь", ItemType.MISC, 0, null)
+        );
     }
 }

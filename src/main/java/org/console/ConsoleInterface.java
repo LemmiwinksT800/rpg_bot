@@ -44,7 +44,7 @@ public class ConsoleInterface {
         }
         System.out.println("\n" + response.getMessage());
 
-        if (response.getChoices() != null) {
+        if (response.getChoices() != null && !response.getChoices().isEmpty()) {
             System.out.println("\nВарианты действий:");
             for (int i = 0; i < response.getChoices().size(); i++) {
                 System.out.println((i + 1) + ". " + response.getChoices().get(i).getText());

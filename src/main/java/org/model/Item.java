@@ -1,4 +1,4 @@
-package org.example.model;
+package org.model;
 
 public class Item {
     private final String id;

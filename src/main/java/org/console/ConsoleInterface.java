@@ -1,7 +1,7 @@
-package org.example.console;
+package org.console;
 
-import org.example.logic.GameLogic;
-import org.example.model.GameResponse;
+import org.logic.GameLogic;
+import org.model.GameResponse;
 import java.util.Scanner;
 
 public class ConsoleInterface {

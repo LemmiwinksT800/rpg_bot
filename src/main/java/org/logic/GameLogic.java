@@ -1,6 +1,11 @@
-package org.example.logic;
+package org.logic;
 
-import org.example.model.*;
+import org.model.*;
+import org.model.Choice;
+import org.model.GameResponse;
+import org.model.Player;
+import org.model.Scenario;
+
 import java.util.*;
 
 

@@ -1,8 +1,8 @@
-package org.example;
+package org;
 
-import org.example.console.ConsoleInterface;
-import org.example.logic.GameLogic;
-import org.example.logic.ScenarioGen;
+import org.console.ConsoleInterface;
+import org.logic.GameLogic;
+import org.logic.ScenarioGen;
 
 public class Main {
     public static void main(String[] args) {

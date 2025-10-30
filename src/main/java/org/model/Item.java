@@ -1,4 +1,4 @@
-package org.example.model;
+package org.model;
 
 public class Item {
     private final String id;
@@ -21,7 +21,6 @@ public class Item {
         this.effect = effect;
     }
 
-    // Геттеры
     public String getId() { return id; }
     public String getName() { return name; }
     public String getDescription() { return description; }
@@ -34,7 +33,6 @@ public class Item {
         return String.format("%s - %s (%s)", name, description, type.toString().toLowerCase());
     }
 
-    // Статические методы для создания стандартных предметов
     public static Item createHealthPotion() {
         return new Item("health_potion", "Зелье здоровья", "Восстанавливает 20 HP",
                 ItemType.POTION, 10, "heal:20");

@@ -1,7 +1,7 @@
-package org.example.logic;
+package org.logic;
 
-import org.example.model.Scenario;
-import org.example.model.Choice;
+import org.model.Scenario;
+import org.model.Choice;
 import java.util.*;
 
 public class ScenarioGen {

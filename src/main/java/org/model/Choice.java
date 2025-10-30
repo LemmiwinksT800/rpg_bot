@@ -1,4 +1,4 @@
-package org.example.model;
+package org.model;
 
 public class Choice {
     private final String text;

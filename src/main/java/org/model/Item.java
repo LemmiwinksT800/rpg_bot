@@ -57,4 +57,8 @@ public class Item {
                 new Item("key", "Ржавый ключ", "Открывает старую дверь", ItemType.MISC, 0, null)
         );
     }
+
+    public static Item findById(String id) {
+        return predefinedItems().stream().filter(i -> i.getId().equals(id)).findFirst().orElse(null);
+    }
 }

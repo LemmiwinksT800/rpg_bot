@@ -5,23 +5,25 @@ import org.model.*;
 import java.util.*;
 
 public class GameLogic {
-    private final ScenarioGen scenarioGenerator;
     private String currentScenarioId;
     private final Map<String, Player> players;
+    private final DatabaseManager dbManager;
 
-    public GameLogic(ScenarioGen scenarioGenerator) {
-        this.scenarioGenerator = scenarioGenerator;
+    public GameLogic(DatabaseManager dbManager) {
+        this.dbManager = dbManager;
         this.players = new HashMap<>();
         this.currentScenarioId = "start";
     }
 
     public void addPlayer(String playerId, String playerName) {
-        players.put(playerId, new Player(playerName));
+        Player player = new Player(playerName);
+        players.put(playerId, player);
+        dbManager.savePlayer(playerId, player, "start");
     }
 
     public GameResponse startGame(String playerId) {
-        Player player = players.get(playerId);
-        Scenario start = scenarioGenerator.getScenario("start");
+        Player player = dbManager.loadPlayer(playerId);
+        Scenario start = dbManager.getScenario("start");
         return buildResponse(start, player, "Игра началась!");
     }
 
@@ -39,11 +41,11 @@ public class GameLogic {
         if ("inventory".equalsIgnoreCase(input)) return getInventoryResponse(player);
         if ("exit".equalsIgnoreCase(input)) return new GameResponse("Выход...", null, true, null);
 
-        Scenario current = scenarioGenerator.getScenario(currentScenarioId);
+        Scenario current = dbManager.getScenario(currentScenarioId);
         if (current == null || current.getChoices() == null) {
             return endOfGame();
         }
-
+        dbManager.savePlayer(playerId, player, currentScenarioId);
         try {
             int choiceIdx = Integer.parseInt(input) - 1;
             if (choiceIdx < 0 || choiceIdx >= current.getChoices().size()) {
@@ -58,7 +60,7 @@ public class GameLogic {
             }
 
             currentScenarioId = choice.getNextScenarioId();
-            Scenario next = scenarioGenerator.getScenario(currentScenarioId);
+            Scenario next = dbManager.getScenario(currentScenarioId);
 
             String message = next != null ? next.getDescription() : "Конец пути...";
             return buildResponse(next, player, message);

@@ -7,8 +7,11 @@ public class Player {
     private int health;
     private int maxHealth;
     private int level;
-    private final Map<String, Integer> stats;
     private final List<Item> inventory;
+    private String id;
+    private String faction;
+    private Map<String, Integer> stats = new HashMap<>();
+
 
     public Player(String name) {
         this.name = name;
@@ -69,4 +72,31 @@ public class Player {
     public boolean isAlive() {
         return health > 0;
     }
+
+    public String getId(){
+        return  id;
+    }
+    public void setId(String newId){
+        id = newId;
+    }
+
+    public void setFaction(String newFaction){
+        faction = newFaction;
+    }
+    public String getFaction(){
+        return faction;
+    }
+
+    public void setMaxHealth(int maxHealth) {
+        this.maxHealth = maxHealth;
+    }
+
+    public void setLevel(int level) {
+        this.level = level;
+    }
+
+    public void setStats(Map<String, Integer> stats){
+        this.stats = stats;
+    }
+
 }

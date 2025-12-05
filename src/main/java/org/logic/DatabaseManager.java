@@ -16,7 +16,7 @@ public class DatabaseManager {
         try (Connection conn = DriverManager.getConnection(DB_URL)) {
             Statement stmt = conn.createStatement();
 
-            // Таблица для игроков
+
             stmt.execute("CREATE TABLE IF NOT EXISTS players (" +
                             "id TEXT PRIMARY KEY, " +
                             "name TEXT, " +
@@ -29,16 +29,16 @@ public class DatabaseManager {
                             "inventory TEXT" +  // Храним IDs предметов через запятую, напр. "sword,health_potion"
                     ")");
 
-            // Таблица для сценариев
+
             stmt.execute("CREATE TABLE IF NOT EXISTS scenarios (" +
                     "id TEXT PRIMARY KEY, " +
                     "description TEXT" +
                     ")");
 
-            // Таблица для выборов (choices) в сценариях
+
             stmt.execute("CREATE TABLE IF NOT EXISTS choices (" +
                     "scenario_id TEXT, " +
-                    "choice_index INTEGER, " +  // Порядок выбора (0,1,2...)
+                    "choice_index INTEGER, " +
                     "text TEXT, " +
                     "next_scenario_id TEXT, " +
                     "effect TEXT, " +
@@ -65,7 +65,7 @@ public class DatabaseManager {
         }
     }
 
-    // Проверка существования сценария
+
     private boolean scenarioExists(String id) {
         try (Connection conn = DriverManager.getConnection(DB_URL);
              PreparedStatement pstmt = conn.prepareStatement("SELECT 1 FROM scenarios WHERE id = ?")) {
@@ -76,7 +76,7 @@ public class DatabaseManager {
         }
     }
 
-    // Добавление сценария
+
     public void addScenario(String id, String description) {
         try (Connection conn = DriverManager.getConnection(DB_URL);
              PreparedStatement pstmt = conn.prepareStatement("INSERT INTO scenarios (id, description) VALUES (?, ?)")) {
@@ -88,7 +88,7 @@ public class DatabaseManager {
         }
     }
 
-    // Добавление выбора
+
     public void addChoice(String scenarioId, int choiceIndex, String text, String nextScenarioId, String effect) {
         try (Connection conn = DriverManager.getConnection(DB_URL);
              PreparedStatement pstmt = conn.prepareStatement(
@@ -104,7 +104,7 @@ public class DatabaseManager {
         }
     }
 
-    // Получение сценария по ID
+
     public Scenario getScenario(String id) {
         try (Connection conn = DriverManager.getConnection(DB_URL)) {
             // Получаем описание

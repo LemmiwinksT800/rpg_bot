@@ -45,7 +45,7 @@ public class GameLogic {
         if (current == null || current.getChoices() == null) {
             return endOfGame();
         }
-        dbManager.savePlayer(playerId, player, currentScenarioId);
+
         try {
             int choiceIdx = Integer.parseInt(input) - 1;
             if (choiceIdx < 0 || choiceIdx >= current.getChoices().size()) {
@@ -54,7 +54,7 @@ public class GameLogic {
 
             Choice choice = current.getChoices().get(choiceIdx);
             applyEffect(player, choice.getEffect());
-
+            dbManager.savePlayer(playerId, player, currentScenarioId);
             if (!player.isAlive()) {
                 return new GameResponse("Вы умерли от полученных ран...", null, false, null);
             }

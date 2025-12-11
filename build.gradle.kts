@@ -14,6 +14,7 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     implementation("org.xerial:sqlite-jdbc:3.46.1.0")
+    implementation("org.telegram:telegrambots:9.2.0")
 }
 
 tasks.test {

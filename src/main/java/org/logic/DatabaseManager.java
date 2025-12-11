@@ -5,7 +5,7 @@ import org.model.*;
 import java.sql.*;
 import java.util.*;
 
-public class DatabaseManager {
+public class DatabaseManager implements PlayerRepository, ScenarioRepository {
     private static final String DB_URL = "jdbc:sqlite:game.db"; // Файл БД в корне проекта
 
     public DatabaseManager() {
@@ -165,6 +165,7 @@ public class DatabaseManager {
                 player.setFaction(rs.getString("faction"));
                 // Stats: парсим строку обратно в Map
                 player.setStats(stringToMap(rs.getString("stats")));
+                player.setCurrentScenarioId(rs.getString("current_scenario_id"));
                 // Inventory: парсим и добавляем предметы
                 String invStr = rs.getString("inventory");
                 if (invStr != null && !invStr.isEmpty()) {

@@ -11,6 +11,7 @@ public class Player {
     private String id;
     private String faction;
     private Map<String, Integer> stats = new HashMap<>();
+    private String currentScenarioId = "start";
 
 
     public Player(String name) {
@@ -98,5 +99,7 @@ public class Player {
     public void setStats(Map<String, Integer> stats){
         this.stats = stats;
     }
+    public String getCurrentScenarioId() { return currentScenarioId; }
+    public void setCurrentScenarioId(String currentScenarioId) { this.currentScenarioId = currentScenarioId; }
 
 }

@@ -5,7 +5,7 @@ import org.model.*;
 import java.sql.*;
 import java.util.*;
 
-public class DatabaseManager {
+public class DatabaseManager implements PlayerRepository, ScenarioRepository {
     private static final String DB_URL = "jdbc:sqlite:game.db"; // Файл БД в корне проекта
 
     public DatabaseManager() {
@@ -16,29 +16,29 @@ public class DatabaseManager {
         try (Connection conn = DriverManager.getConnection(DB_URL)) {
             Statement stmt = conn.createStatement();
 
-            // Таблица для игроков
+
             stmt.execute("CREATE TABLE IF NOT EXISTS players (" +
-                            "id TEXT PRIMARY KEY, " +
-                            "name TEXT, " +
-                            "health INTEGER, " +
-                            "max_health INTEGER, " +
-                            "level INTEGER, " +
-                            "faction TEXT, " +  // Для фракции (позже добавим)
-                            "current_scenario_id TEXT, " +
-                            "stats TEXT, " +    // Храним как JSON-строку"
-                            "inventory TEXT" +  // Храним IDs предметов через запятую, напр. "sword,health_potion"
+                    "id TEXT PRIMARY KEY, " +
+                    "name TEXT, " +
+                    "health INTEGER, " +
+                    "max_health INTEGER, " +
+                    "level INTEGER, " +
+                    "faction TEXT, " +  // Для фракции (позже добавим)
+                    "current_scenario_id TEXT, " +
+                    "stats TEXT, " +    // Храним как JSON-строку"
+                    "inventory TEXT" +  // Храним IDs предметов через запятую, напр. "sword,health_potion"
                     ")");
 
-            // Таблица для сценариев
+
             stmt.execute("CREATE TABLE IF NOT EXISTS scenarios (" +
                     "id TEXT PRIMARY KEY, " +
                     "description TEXT" +
                     ")");
 
-            // Таблица для выборов (choices) в сценариях
+
             stmt.execute("CREATE TABLE IF NOT EXISTS choices (" +
                     "scenario_id TEXT, " +
-                    "choice_index INTEGER, " +  // Порядок выбора (0,1,2...)
+                    "choice_index INTEGER, " +
                     "text TEXT, " +
                     "next_scenario_id TEXT, " +
                     "effect TEXT, " +
@@ -65,7 +65,7 @@ public class DatabaseManager {
         }
     }
 
-    // Проверка существования сценария
+
     private boolean scenarioExists(String id) {
         try (Connection conn = DriverManager.getConnection(DB_URL);
              PreparedStatement pstmt = conn.prepareStatement("SELECT 1 FROM scenarios WHERE id = ?")) {
@@ -76,7 +76,7 @@ public class DatabaseManager {
         }
     }
 
-    // Добавление сценария
+
     public void addScenario(String id, String description) {
         try (Connection conn = DriverManager.getConnection(DB_URL);
              PreparedStatement pstmt = conn.prepareStatement("INSERT INTO scenarios (id, description) VALUES (?, ?)")) {
@@ -88,7 +88,7 @@ public class DatabaseManager {
         }
     }
 
-    // Добавление выбора
+
     public void addChoice(String scenarioId, int choiceIndex, String text, String nextScenarioId, String effect) {
         try (Connection conn = DriverManager.getConnection(DB_URL);
              PreparedStatement pstmt = conn.prepareStatement(
@@ -104,7 +104,7 @@ public class DatabaseManager {
         }
     }
 
-    // Получение сценария по ID
+
     public Scenario getScenario(String id) {
         try (Connection conn = DriverManager.getConnection(DB_URL)) {
             // Получаем описание
@@ -165,6 +165,7 @@ public class DatabaseManager {
                 player.setFaction(rs.getString("faction"));
                 // Stats: парсим строку обратно в Map
                 player.setStats(stringToMap(rs.getString("stats")));
+                player.setCurrentScenarioId(rs.getString("current_scenario_id"));
                 // Inventory: парсим и добавляем предметы
                 String invStr = rs.getString("inventory");
                 if (invStr != null && !invStr.isEmpty()) {

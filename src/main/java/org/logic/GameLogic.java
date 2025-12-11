@@ -5,68 +5,76 @@ import org.model.*;
 import java.util.*;
 
 public class GameLogic {
-    private String currentScenarioId;
-    private final Map<String, Player> players;
-    private final DatabaseManager dbManager;
+    private final PlayerRepository playerRepository;
+    private final ScenarioRepository scenarioRepository;
+    public String currentScenarioId;
 
-    public GameLogic(DatabaseManager dbManager) {
-        this.dbManager = dbManager;
-        this.players = new HashMap<>();
+    public GameLogic(PlayerRepository playerRepository, ScenarioRepository scenarioRepository) {
+        this.playerRepository = playerRepository;
+        this.scenarioRepository = scenarioRepository;
         this.currentScenarioId = "start";
     }
 
     public void addPlayer(String playerId, String playerName) {
         Player player = new Player(playerName);
-        players.put(playerId, player);
-        dbManager.savePlayer(playerId, player, "start");
+        playerRepository.savePlayer(playerId, player, "start");
     }
 
     public GameResponse startGame(String playerId) {
-        Player player = dbManager.loadPlayer(playerId);
-        Scenario start = dbManager.getScenario("start");
-        return buildResponse(start, player, "Игра началась!");
+        Player player = playerRepository.loadPlayer(playerId);
+        if (player == null) {
+            return new GameResponse(null, null, false, null, GameResponse.ResponseType.ERROR); // UI покажет "Игрок не найден"
+        }
+        Scenario start = scenarioRepository.getScenario(currentScenarioId);
+        return buildResponse(start, player, null, GameResponse.ResponseType.NORMAL);
     }
 
     public GameResponse processInput(String playerId, String input) {
-        Player player = players.get(playerId);
-        if (player == null) return new GameResponse("Игрок не найден.", null, false, null);
+        Player player = playerRepository.loadPlayer(playerId);
+        if (player == null) {
+            return new GameResponse(null, null, false, null, GameResponse.ResponseType.ERROR);
+        }
 
         if (!player.isAlive()) {
-            return new GameResponse("Вы мертвы. Игра окончена.", null, false, null);
+            return new GameResponse(null, null, false, null, GameResponse.ResponseType.DEAD);
         }
 
-        // Обработка команд
-        if ("help".equalsIgnoreCase(input)) return getHelpResponse();
-        if ("status".equalsIgnoreCase(input)) return getStatusResponse(player);
-        if ("inventory".equalsIgnoreCase(input)) return getInventoryResponse(player);
-        if ("exit".equalsIgnoreCase(input)) return new GameResponse("Выход...", null, true, null);
+        GameResponse.ResponseType commandType = getCommandType(input);
+        if (commandType != null) {
+            return new GameResponse(null, null, true, player.getStatus(), commandType);
+        }
 
-        Scenario current = dbManager.getScenario(currentScenarioId);
+        Scenario current = scenarioRepository.getScenario(currentScenarioId);
         if (current == null || current.getChoices() == null) {
-            return endOfGame();
+            return new GameResponse(null, null, true,
+                    null, GameResponse.ResponseType.END);
         }
-        dbManager.savePlayer(playerId, player, currentScenarioId);
+
         try {
             int choiceIdx = Integer.parseInt(input) - 1;
             if (choiceIdx < 0 || choiceIdx >= current.getChoices().size()) {
-                return buildResponse(current, player, "Неверный выбор.");
+                return buildResponse(current, player, "invalid_choice",
+                        GameResponse.ResponseType.ERROR);
             }
 
             Choice choice = current.getChoices().get(choiceIdx);
             applyEffect(player, choice.getEffect());
 
             if (!player.isAlive()) {
-                return new GameResponse("Вы умерли от полученных ран...", null, false, null);
+                playerRepository.savePlayer(playerId, player, currentScenarioId);
+                return new GameResponse(null, null,
+                        false, null, GameResponse.ResponseType.DEAD);
             }
 
             currentScenarioId = choice.getNextScenarioId();
-            Scenario next = dbManager.getScenario(currentScenarioId);
+            playerRepository.savePlayer(playerId, player, currentScenarioId);
 
-            String message = next != null ? next.getDescription() : "Конец пути...";
-            return buildResponse(next, player, message);
+            Scenario next = scenarioRepository.getScenario(currentScenarioId);
+            return buildResponse(next, player, null, GameResponse.ResponseType.NORMAL);
 
         } catch (NumberFormatException e) {
-            return buildResponse(current, player, "Введите номер варианта.");
+            return buildResponse(scenarioRepository.getScenario(currentScenarioId), player,
+                    "invalid_input", GameResponse.ResponseType.ERROR);
         }
     }
 
@@ -90,39 +98,34 @@ public class GameLogic {
         }
     }
 
-    private GameResponse buildResponse(Scenario scenario, Player player, String overrideMessage) {
+    private GameResponse buildResponse(Scenario scenario, Player player, String overrideMessage, GameResponse.ResponseType type) {
         String message = overrideMessage != null ? overrideMessage : (scenario != null ? scenario.getDescription() : "");
         List<Choice> choices = scenario != null ? scenario.getChoices() : null;
-        return new GameResponse(message, choices, true, player.getStatus());
+        return new GameResponse(message, choices, true, player != null ? player.getStatus() : null, type);
     }
 
-    private GameResponse getHelpResponse() {
-        String help = """
-                Команды:
-                • номер — выбрать действие
-                • help — справка
-                • status — статус героя
-                • inventory — инвентарь
-                • exit — выход
-                """;
-        return new GameResponse(help, null, true, null);
+    private GameResponse.ResponseType getCommandType(String input) {
+        return switch (input.toLowerCase()) {
+            case "help" -> GameResponse.ResponseType.HELP;
+            case "status" -> GameResponse.ResponseType.STATUS;
+            case "inventory" -> GameResponse.ResponseType.INVENTORY;
+            case "exit" -> GameResponse.ResponseType.EXIT;
+            default -> null;
+        };
     }
 
-    private GameResponse getStatusResponse(Player player) {
-        return new GameResponse("Ваш статус:\n" + player.getStatus(), null, true, null);
+    public Player loadPlayer(String playerId) {
+        return playerRepository.loadPlayer(playerId);
     }
 
-    private GameResponse getInventoryResponse(Player player) {
-        if (player.getInventory().isEmpty()) {
-            return new GameResponse("Инвентарь пуст.", null, true, null);
+    public void setCurrentScenarioId(String id) {
+        this.currentScenarioId = id;
+    }
+
+    public void saveCurrentState(String playerId) {
+        Player player = loadPlayer(playerId);
+        if (player != null) {
+            playerRepository.savePlayer(playerId, player, currentScenarioId);
         }
-        String items = player.getInventory().stream()
-                .map(i -> "- " + i.toString())
-                .collect(java.util.stream.Collectors.joining("\n"));
-        return new GameResponse("Ваш инвентарь:\n" + items, null, true, null);
-    }
-
-    private GameResponse endOfGame() {
-        return new GameResponse("Приключение окончено. Введите 'exit'.", null, true, null);
     }
 }

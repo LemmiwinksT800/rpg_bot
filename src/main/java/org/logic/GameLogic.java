@@ -7,7 +7,7 @@ import java.util.*;
 public class GameLogic {
     private final PlayerRepository playerRepository;
     private final ScenarioRepository scenarioRepository;
-    private String currentScenarioId;
+    public String currentScenarioId;
 
     public GameLogic(PlayerRepository playerRepository, ScenarioRepository scenarioRepository) {
         this.playerRepository = playerRepository;

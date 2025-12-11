@@ -26,7 +26,11 @@ class GameLogicTest {
     @BeforeEach
     void setUp() {
         player = new Player("TestHero");
+<<<<<<< HEAD
         lenient().when(playerRepo.loadPlayer(playerId)).thenReturn(player);
+=======
+        lenient().when(playerRepo.loadPlayer(playerId)).thenReturn(player);  // Add lenient() here
+>>>>>>> develop
     }
 
     @Test

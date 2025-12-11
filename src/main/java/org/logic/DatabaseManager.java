@@ -18,15 +18,15 @@ public class DatabaseManager implements PlayerRepository, ScenarioRepository {
 
 
             stmt.execute("CREATE TABLE IF NOT EXISTS players (" +
-                            "id TEXT PRIMARY KEY, " +
-                            "name TEXT, " +
-                            "health INTEGER, " +
-                            "max_health INTEGER, " +
-                            "level INTEGER, " +
-                            "faction TEXT, " +  // Для фракции (позже добавим)
-                            "current_scenario_id TEXT, " +
-                            "stats TEXT, " +    // Храним как JSON-строку"
-                            "inventory TEXT" +  // Храним IDs предметов через запятую, напр. "sword,health_potion"
+                    "id TEXT PRIMARY KEY, " +
+                    "name TEXT, " +
+                    "health INTEGER, " +
+                    "max_health INTEGER, " +
+                    "level INTEGER, " +
+                    "faction TEXT, " +  // Для фракции (позже добавим)
+                    "current_scenario_id TEXT, " +
+                    "stats TEXT, " +    // Храним как JSON-строку"
+                    "inventory TEXT" +  // Храним IDs предметов через запятую, напр. "sword,health_potion"
                     ")");
 
 

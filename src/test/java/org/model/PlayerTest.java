@@ -38,7 +38,7 @@ class PlayerTest {
         assertEquals(0, player.getHealth());
         assertFalse(player.isAlive());
 
-        player.heal(50);  // Не выше max, но от 0
+        player.heal(50);
         assertEquals(50, player.getHealth());
         assertTrue(player.isAlive());
     }

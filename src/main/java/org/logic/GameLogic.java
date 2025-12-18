@@ -23,7 +23,7 @@ public class GameLogic {
     public GameResponse startGame(String playerId) {
         Player player = playerRepository.loadPlayer(playerId);
         if (player == null) {
-            return new GameResponse(null, null, false, null, GameResponse.ResponseType.ERROR); // UI покажет "Игрок не найден"
+            return new GameResponse(GameResponse.ResponseType.ERROR, "player_not_found", false);
         }
         Scenario start = scenarioRepository.getScenario(currentScenarioId);
         return buildResponse(start, player, null, GameResponse.ResponseType.NORMAL);
@@ -32,29 +32,27 @@ public class GameLogic {
     public GameResponse processInput(String playerId, String input) {
         Player player = playerRepository.loadPlayer(playerId);
         if (player == null) {
-            return new GameResponse(null, null, false, null, GameResponse.ResponseType.ERROR);
+            return new GameResponse(GameResponse.ResponseType.ERROR, "player_not_found", false);
         }
 
         if (!player.isAlive()) {
-            return new GameResponse(null, null, false, null, GameResponse.ResponseType.DEAD);
+            return new GameResponse(GameResponse.ResponseType.DEAD, false);
         }
 
         GameResponse.ResponseType commandType = getCommandType(input);
         if (commandType != null) {
-            return new GameResponse(null, null, true, player.getStatus(), commandType);
+            return new GameResponse(commandType, true, player.getStatus());
         }
 
         Scenario current = scenarioRepository.getScenario(currentScenarioId);
         if (current == null || current.getChoices() == null) {
-            return new GameResponse(null, null, true,
-                    null, GameResponse.ResponseType.END);
+            return new GameResponse(GameResponse.ResponseType.END, true);
         }
 
         try {
             int choiceIdx = Integer.parseInt(input) - 1;
             if (choiceIdx < 0 || choiceIdx >= current.getChoices().size()) {
-                return buildResponse(current, player, "invalid_choice",
-                        GameResponse.ResponseType.ERROR);
+                return buildResponse(current, player, null, GameResponse.ResponseType.ERROR, "invalid_choice");
             }
 
             Choice choice = current.getChoices().get(choiceIdx);
@@ -62,8 +60,7 @@ public class GameLogic {
 
             if (!player.isAlive()) {
                 playerRepository.savePlayer(playerId, player, currentScenarioId);
-                return new GameResponse(null, null,
-                        false, null, GameResponse.ResponseType.DEAD);
+                return new GameResponse(GameResponse.ResponseType.DEAD, false);
             }
 
             currentScenarioId = choice.getNextScenarioId();
@@ -73,8 +70,7 @@ public class GameLogic {
             return buildResponse(next, player, null, GameResponse.ResponseType.NORMAL);
 
         } catch (NumberFormatException e) {
-            return buildResponse(scenarioRepository.getScenario(currentScenarioId), player,
-                    "invalid_input", GameResponse.ResponseType.ERROR);
+            return buildResponse(scenarioRepository.getScenario(currentScenarioId), player, null, GameResponse.ResponseType.ERROR, "invalid_input");
         }
     }
 
@@ -99,9 +95,13 @@ public class GameLogic {
     }
 
     private GameResponse buildResponse(Scenario scenario, Player player, String overrideMessage, GameResponse.ResponseType type) {
+        return buildResponse(scenario, player, overrideMessage, type, null);
+    }
+
+    private GameResponse buildResponse(Scenario scenario, Player player, String overrideMessage, GameResponse.ResponseType type, String errorKey) {
         String message = overrideMessage != null ? overrideMessage : (scenario != null ? scenario.getDescription() : "");
         List<Choice> choices = scenario != null ? scenario.getChoices() : null;
-        return new GameResponse(message, choices, true, player != null ? player.getStatus() : null, type);
+        return new GameResponse(message, choices, true, player != null ? player.getStatus() : null, type, errorKey);
     }
 
     private GameResponse.ResponseType getCommandType(String input) {

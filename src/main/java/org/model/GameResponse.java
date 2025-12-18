@@ -13,18 +13,35 @@ public class GameResponse {
     public enum ResponseType {
         NORMAL, HELP, STATUS, INVENTORY, END, DEAD, ERROR, EXIT
     }
-    public GameResponse(String message, List<Choice> choices, boolean success, String playerStatus, ResponseType type) {
-        this(message, choices, success, playerStatus, type, null);
-    }
 
-    public GameResponse(String message, List<Choice> choices, boolean success,
-                        String playerStatus, ResponseType type, String errorKey) {
+    // Полный конструктор (все параметры)
+    public GameResponse(String message, List<Choice> choices, boolean success, String playerStatus, ResponseType type, String errorKey) {
         this.message = message;
         this.choices = choices;
         this.success = success;
         this.playerStatus = playerStatus;
         this.type = type;
         this.errorKey = errorKey;
+    }
+
+    // Перегруженный без errorKey (для нормальных случаев)
+    public GameResponse(String message, List<Choice> choices, boolean success, String playerStatus, ResponseType type) {
+        this(message, choices, success, playerStatus, type, null);
+    }
+
+    // Новый: Для простых ответов (type + success, всё остальное null)
+    public GameResponse(ResponseType type, boolean success) {
+        this(null, null, success, null, type, null);
+    }
+
+    // Новый: Для ответов с статусом (type + success + playerStatus, остальное null)
+    public GameResponse(ResponseType type, boolean success, String playerStatus) {
+        this(null, null, success, playerStatus, type, null);
+    }
+
+    // Новый: Для ошибок (type + success + errorKey, остальное null)
+    public GameResponse(ResponseType type, String errorKey,  boolean success) {
+        this(null, null, success, null, type, errorKey);
     }
 
     public String getMessage() { return message; }

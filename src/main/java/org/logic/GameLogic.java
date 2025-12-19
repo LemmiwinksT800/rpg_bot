@@ -74,6 +74,16 @@ public class GameLogic {
         }
     }
 
+    private GameResponse.ResponseType getCommandType(String input) {
+        return switch (input.toLowerCase()) {
+            case "help" -> GameResponse.ResponseType.HELP;
+            case "status" -> GameResponse.ResponseType.STATUS;
+            case "inventory" -> GameResponse.ResponseType.INVENTORY;
+            case "exit" -> GameResponse.ResponseType.EXIT;
+            default -> null;
+        };
+    }
+
     private void applyEffect(Player player, Effect effect) {
         if (effect == null) return;
 
@@ -104,16 +114,6 @@ public class GameLogic {
         return new GameResponse(message, choices, true, player != null ? player.getStatus() : null, type, errorKey);
     }
 
-    private GameResponse.ResponseType getCommandType(String input) {
-        return switch (input.toLowerCase()) {
-            case "help" -> GameResponse.ResponseType.HELP;
-            case "status" -> GameResponse.ResponseType.STATUS;
-            case "inventory" -> GameResponse.ResponseType.INVENTORY;
-            case "exit" -> GameResponse.ResponseType.EXIT;
-            default -> null;
-        };
-    }
-
     public Player loadPlayer(String playerId) {
         return playerRepository.loadPlayer(playerId);
     }
@@ -126,6 +126,49 @@ public class GameLogic {
         Player player = loadPlayer(playerId);
         if (player != null) {
             playerRepository.savePlayer(playerId, player, currentScenarioId);
+        }
+    }
+
+    public List<String> getAllScenarioIds() {
+        return scenarioRepository.getAllScenarioIds();
+    }
+
+    public boolean scenarioExists(String id) {
+        return scenarioRepository.getScenario(id) != null;
+    }
+
+    public void chooseCampaign(String playerId, String campaignId) {
+        DatabaseManager dbManager = (DatabaseManager) playerRepository;
+        Campaign campaign = dbManager.getCampaignById(campaignId);
+        if (campaign == null) return;
+
+        Player player = loadPlayer(playerId);
+        if (player != null) {
+            player.setFaction(campaign.getFaction());
+            player.setStats(dbManager.stringToMap(campaign.getStartStats()));
+            setCurrentScenarioId(campaign.getStartScenarioId());
+            saveCurrentState(playerId);
+        }
+    }
+
+    public List<Campaign> getAllCampaigns() {
+        return ((DatabaseManager) playerRepository).getAllCampaigns();
+    }
+
+    public void resetForNewCampaign(String playerId) {
+        Player player = loadPlayer(playerId);
+        if (player != null) {
+            player.setHealth(100);
+            player.setMaxHealth(100);
+            player.setLevel(1);
+            player.setFaction(null);
+            player.setStats(new HashMap<>() {{
+                put("stealth", 10);
+                put("strength", 10);
+            }});
+            player.getInventory().clear();
+            setCurrentScenarioId("start");
+            saveCurrentState(playerId);
         }
     }
 }

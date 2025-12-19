@@ -12,13 +12,14 @@ import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
-
+import org.model.Campaign;
 import java.util.ArrayList;
 import java.util.List;
 
 public class RPGTelegramBot extends TelegramLongPollingBot {
     private final GameLogic gameLogic;
     private final String botToken;
+    private boolean isChoosingScenario = false;
 
     public RPGTelegramBot(String botToken) {
         this.botToken = botToken;
@@ -42,9 +43,8 @@ public class RPGTelegramBot extends TelegramLongPollingBot {
     public void onUpdateReceived(Update update) {
         if (update.hasMessage() && update.getMessage().hasText()) {
             String chatId = String.valueOf(update.getMessage().getChatId());
-            String playerId = chatId;  // Используем chatId как playerId (для приватных чатов)
+            String playerId = chatId;
             String input = update.getMessage().getText().trim();
-
 
             if (input.startsWith("/")) {
                 input = input.substring(1).toLowerCase();
@@ -52,6 +52,8 @@ public class RPGTelegramBot extends TelegramLongPollingBot {
 
             if (input.equals("start")) {
                 handleStart(chatId, playerId, update);
+            } else if (isChoosingScenario) {
+                handleScenarioChoice(chatId, playerId, input);  // NEW: Обработка выбора сценария
             } else {
                 handleInput(chatId, playerId, input);
             }
@@ -62,7 +64,6 @@ public class RPGTelegramBot extends TelegramLongPollingBot {
         var player = gameLogic.loadPlayer(playerId);
         String playerName;
         if (player == null) {
-
             playerName = update.getMessage().getFrom().getFirstName();
             if (playerName == null || playerName.isEmpty()) {
                 playerName = "Player_" + chatId;
@@ -70,14 +71,32 @@ public class RPGTelegramBot extends TelegramLongPollingBot {
             gameLogic.addPlayer(playerId, playerName);
             player = gameLogic.loadPlayer(playerId);
             sendMessage(chatId, "Новый герой создан! Добро пожаловать, " + playerName + ".");
+
+            List<Campaign> campaigns = gameLogic.getAllCampaigns();
+            if (!campaigns.isEmpty()) {
+                isChoosingScenario = true;  // Флаг для режима выбора
+                sendMessageWithKeyboard(chatId, "Выберите вариант сценария:", campaigns.stream().map(Campaign::getName).toList());
+            }else {
+                sendResponse(chatId, gameLogic.startGame(playerId));
+            }
         } else {
             playerName = player.getName();
             sendMessage(chatId, "Прогресс загружен для " + playerName + "!");
             gameLogic.setCurrentScenarioId(player.getCurrentScenarioId());
+            sendResponse(chatId, gameLogic.startGame(playerId));
         }
+    }
 
-        GameResponse response = gameLogic.startGame(playerId);
-        sendResponse(chatId, response);
+    private void handleScenarioChoice(String chatId, String playerId, String input) {
+        List<Campaign> campaigns = gameLogic.getAllCampaigns();
+        Campaign selected = campaigns.stream().filter(c -> c.getName().equalsIgnoreCase(input)).findFirst().orElse(null);
+        if (selected != null) {
+            gameLogic.chooseCampaign(playerId, selected.getId());
+            isChoosingScenario = false;
+            sendResponse(chatId, gameLogic.startGame(playerId));
+        } else {
+            sendMessage(chatId, "Неверный выбор. Попробуйте снова.");
+        }
     }
 
     private void handleInput(String chatId, String playerId, String input) {
@@ -188,4 +207,33 @@ public class RPGTelegramBot extends TelegramLongPollingBot {
             e.printStackTrace();
         }
     }
+
+    private void sendMessageWithKeyboard(String chatId, String text, List<String> buttons) { // NEW: Клавиатура для выбора
+        SendMessage message = new SendMessage();
+        message.setChatId(chatId);
+        message.setText(text);
+
+        ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
+        keyboardMarkup.setResizeKeyboard(true);
+        List<KeyboardRow> keyboard = new ArrayList<>();
+        KeyboardRow row = new KeyboardRow();
+        for (String button : buttons) {
+            row.add(button);
+            if (row.size() == 3) {  // По 3 кнопки в ряд
+                keyboard.add(row);
+                row = new KeyboardRow();
+            }
+        }
+        if (!row.isEmpty()) keyboard.add(row);
+        keyboardMarkup.setKeyboard(keyboard);
+        message.setReplyMarkup(keyboardMarkup);
+
+        try {
+            execute(message);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+
 }

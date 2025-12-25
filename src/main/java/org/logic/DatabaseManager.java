@@ -30,7 +30,6 @@ public class DatabaseManager implements PlayerRepository, ScenarioRepository {
                 addCampaign("engineer", "Космический инженер", "Вы инженер на корабле с инопланетянином.", "spaceship", "Engineer", "intelligence:15,strength:5");
             }
 
-
             stmt.execute("CREATE TABLE IF NOT EXISTS players (" +
                     "id TEXT PRIMARY KEY, " +
                     "name TEXT, " +
@@ -40,15 +39,14 @@ public class DatabaseManager implements PlayerRepository, ScenarioRepository {
                     "faction TEXT, " +  // Для фракции (позже добавим)
                     "current_scenario_id TEXT, " +
                     "stats TEXT, " +    // Храним как JSON-строку"
-                    "inventory TEXT" +  // Храним IDs предметов через запятую, напр. "sword,health_potion"
+                    "inventory TEXT, " +  // Храним IDs предметов через запятую, напр. "sword,health_potion"
+                    "party_id INTEGER DEFAULT NULL" +
                     ")");
-
 
             stmt.execute("CREATE TABLE IF NOT EXISTS scenarios (" +
                     "id TEXT PRIMARY KEY, " +
                     "description TEXT" +
                     ")");
-
 
             stmt.execute("CREATE TABLE IF NOT EXISTS choices (" +
                     "scenario_id TEXT, " +
@@ -103,11 +101,34 @@ public class DatabaseManager implements PlayerRepository, ScenarioRepository {
             if (!scenarioExists("end_engineer")) {
                 addScenario("end_engineer", "Вы справились с угрозой! Корабль спасён. (Конец кампании)");
             }
+
+            stmt.execute("CREATE TABLE IF NOT EXISTS parties (" +
+                    "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                    "name TEXT, " +
+                    "leader_id TEXT, " +
+                    "player_ids TEXT, " +  // "player1,player2"
+                    "current_scenario_id TEXT, " +
+                    "current_turn_player_id TEXT, " +
+                    "status TEXT" +  // "active" или "ended"
+                    ")");
+
+            stmt.execute("CREATE TABLE IF NOT EXISTS invitations (" +
+                    "party_id INTEGER, " +
+                    "invited_player_id TEXT, " +
+                    "status TEXT" +  // "pending", "accepted", "declined"
+                    ")");
+
+            // Если колонка party_id еще не добавлена (игнорируем ошибку, если уже есть)
+            try {
+                stmt.execute("ALTER TABLE players ADD COLUMN party_id INTEGER DEFAULT NULL");
+            } catch (SQLException ignored) {
+                // Колонка уже существует
+            }
+
         } catch (SQLException e) {
             System.err.println("Ошибка инициализации БД: " + e.getMessage());
         }
     }
-
 
     private boolean scenarioExists(String id) {
         try (Connection conn = DriverManager.getConnection(DB_URL);
@@ -119,7 +140,6 @@ public class DatabaseManager implements PlayerRepository, ScenarioRepository {
         }
     }
 
-
     public void addScenario(String id, String description) {
         try (Connection conn = DriverManager.getConnection(DB_URL);
              PreparedStatement pstmt = conn.prepareStatement("INSERT INTO scenarios (id, description) VALUES (?, ?)")) {
@@ -130,7 +150,6 @@ public class DatabaseManager implements PlayerRepository, ScenarioRepository {
             System.err.println("Ошибка добавления сценария: " + e.getMessage());
         }
     }
-
 
     public void addChoice(String scenarioId, int choiceIndex, String text, String nextScenarioId, String effect) {
         try (Connection conn = DriverManager.getConnection(DB_URL);
@@ -146,7 +165,6 @@ public class DatabaseManager implements PlayerRepository, ScenarioRepository {
             System.err.println("Ошибка добавления выбора: " + e.getMessage());
         }
     }
-
 
     public Scenario getScenario(String id) {
         try (Connection conn = DriverManager.getConnection(DB_URL)) {
@@ -173,27 +191,26 @@ public class DatabaseManager implements PlayerRepository, ScenarioRepository {
         }
     }
 
-
     public void savePlayer(String playerId, Player player, String currentScenarioId) {
         try (Connection conn = DriverManager.getConnection(DB_URL);
              PreparedStatement pstmt = conn.prepareStatement(
-                     "INSERT OR REPLACE INTO players (id, name, health, max_health, level, faction, current_scenario_id, stats, inventory) " +
-                             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+                     "INSERT OR REPLACE INTO players (id, name, health, max_health, level, faction, current_scenario_id, stats, inventory, party_id) " +
+                             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
             pstmt.setString(1, playerId);
             pstmt.setString(2, player.getName());
             pstmt.setInt(3, player.getHealth());
             pstmt.setInt(4, player.getMaxHealth());
             pstmt.setInt(5, player.getLevel());
-            pstmt.setString(6, player.getFaction());  // Будет null пока
+            pstmt.setString(6, player.getFaction());
             pstmt.setString(7, currentScenarioId);
-            pstmt.setString(8, mapToString(player.getStats()));  // Конверт Map в строку, напр. "stealth:10,strength:10"
+            pstmt.setString(8, mapToString(player.getStats()));
             pstmt.setString(9, String.join(",", player.getInventory().stream().map(Item::getId).toList()));
+            pstmt.setObject(10, player.getPartyId());  // Может быть null
             pstmt.executeUpdate();
         } catch (SQLException e) {
             System.err.println("Ошибка сохранения игрока: " + e.getMessage());
         }
     }
-
 
     public Player loadPlayer(String playerId) {
         try (Connection conn = DriverManager.getConnection(DB_URL);
@@ -206,14 +223,13 @@ public class DatabaseManager implements PlayerRepository, ScenarioRepository {
                 player.setMaxHealth(rs.getInt("max_health"));
                 player.setLevel(rs.getInt("level"));
                 player.setFaction(rs.getString("faction"));
-                // Stats: парсим строку обратно в Map
                 player.setStats(stringToMap(rs.getString("stats")));
                 player.setCurrentScenarioId(rs.getString("current_scenario_id"));
-                // Inventory: парсим и добавляем предметы
+                player.setPartyId(rs.getObject("party_id") == null ? null : rs.getInt("party_id"));
                 String invStr = rs.getString("inventory");
                 if (invStr != null && !invStr.isEmpty()) {
                     Arrays.stream(invStr.split(",")).forEach(id -> {
-                        Item item = Item.findById(id);  // Нужно добавить в Item статический метод findById
+                        Item item = Item.findById(id);
                         if (item != null) player.addItem(item);
                     });
                 }
@@ -286,7 +302,7 @@ public class DatabaseManager implements PlayerRepository, ScenarioRepository {
         }
     }
 
-    public List<Campaign> getAllCampaigns() {  // Новый класс Campaign (ниже)
+    public List<Campaign> getAllCampaigns() {
         List<Campaign> campaigns = new ArrayList<>();
         try (Connection conn = DriverManager.getConnection(DB_URL);
              Statement stmt = conn.createStatement();
@@ -326,5 +342,113 @@ public class DatabaseManager implements PlayerRepository, ScenarioRepository {
             System.err.println("Ошибка получения кампании: " + e.getMessage());
         }
         return null;
+    }
+
+    // Мультиплеерные методы
+    public int createParty(String name, String leaderId, String startScenarioId) {
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+             PreparedStatement pstmt = conn.prepareStatement(
+                     "INSERT INTO parties (name, leader_id, player_ids, current_scenario_id, current_turn_player_id, status) " +
+                             "VALUES (?, ?, ?, ?, ?, ?)", Statement.RETURN_GENERATED_KEYS)) {
+            pstmt.setString(1, name);
+            pstmt.setString(2, leaderId);
+            pstmt.setString(3, leaderId);  // Изначально только лидер
+            pstmt.setString(4, startScenarioId);
+            pstmt.setString(5, leaderId);  // Первый ход лидеру
+            pstmt.setString(6, "active");
+            pstmt.executeUpdate();
+            ResultSet rs = pstmt.getGeneratedKeys();
+            if (rs.next()) {
+                return rs.getInt(1);  // Возвращаем ID партии
+            }
+        } catch (SQLException e) {
+            System.err.println("Ошибка создания партии: " + e.getMessage());
+        }
+        return -1;
+    }
+
+    public Party getParty(int partyId) {
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+             PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM parties WHERE id = ?")) {
+            pstmt.setInt(1, partyId);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                String playerIdsStr = rs.getString("player_ids");
+                List<String> playerIds = new ArrayList<>();
+                if (playerIdsStr != null && !playerIdsStr.isEmpty()) {
+                    playerIds.addAll(Arrays.asList(playerIdsStr.split(",")));
+                    playerIds.removeIf(String::isEmpty);  // Удаляем пустые элементы, если есть
+                }
+
+                return new Party(
+                        rs.getInt("id"),
+                        rs.getString("name"),
+                        rs.getString("leader_id"),
+                        playerIds,
+                        rs.getString("current_scenario_id"),
+                        rs.getString("current_turn_player_id"),
+                        rs.getString("status")
+                );
+            }
+        } catch (SQLException e) {
+            System.err.println("Ошибка получения партии: " + e.getMessage());
+        }
+        return null;
+    }
+
+    public void updateParty(Party party) {
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+             PreparedStatement pstmt = conn.prepareStatement(
+                     "UPDATE parties SET player_ids = ?, current_scenario_id = ?, current_turn_player_id = ?, status = ? WHERE id = ?")) {
+            pstmt.setString(1, String.join(",", party.getPlayerIds()));
+            pstmt.setString(2, party.getCurrentScenarioId());
+            pstmt.setString(3, party.getCurrentTurnPlayerId());
+            pstmt.setString(4, party.getStatus());
+            pstmt.setInt(5, party.getId());
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            System.err.println("Ошибка обновления партии: " + e.getMessage());
+        }
+    }
+
+    public void invitePlayer(int partyId, String invitedPlayerId) {
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+             PreparedStatement pstmt = conn.prepareStatement(
+                     "INSERT INTO invitations (party_id, invited_player_id, status) VALUES (?, ?, ?)")) {
+            pstmt.setInt(1, partyId);
+            pstmt.setString(2, invitedPlayerId);
+            pstmt.setString(3, "pending");
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            System.err.println("Ошибка приглашения: " + e.getMessage());
+        }
+    }
+
+    public List<Invitation> getInvitationsForPlayer(String playerId) {
+        List<Invitation> invitations = new ArrayList<>();
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+             PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM invitations WHERE invited_player_id = ? AND status = 'pending'")) {
+            pstmt.setString(1, playerId);
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                invitations.add(new Invitation(rs.getInt("party_id"), playerId, rs.getString("status")));
+            }
+        } catch (SQLException e) {
+            System.err.println("Ошибка получения приглашений: " + e.getMessage());
+        }
+        return invitations;
+    }
+
+    public void updateInvitationStatus(int partyId, String playerId, String status) {
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+             PreparedStatement pstmt = conn.prepareStatement(
+                     "UPDATE invitations SET status = ? WHERE party_id = ? AND invited_player_id = ?")) {
+            pstmt.setString(1, status);
+            pstmt.setInt(2, partyId);
+            pstmt.setString(3, playerId);
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            System.err.println("Ошибка обновления приглашения: " + e.getMessage());
+        }
     }
 }

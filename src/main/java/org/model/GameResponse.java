@@ -29,17 +29,17 @@ public class GameResponse {
         this(message, choices, success, playerStatus, type, null);
     }
 
-    // Новый: Для простых ответов (type + success, всё остальное null)
+    // Для простых ответов (type + success, всё остальное null)
     public GameResponse(ResponseType type, boolean success) {
         this(null, null, success, null, type, null);
     }
 
-    // Новый: Для ответов с статусом (type + success + playerStatus, остальное null)
+    // Для ответов с статусом (type + success + playerStatus, остальное null)
     public GameResponse(ResponseType type, boolean success, String playerStatus) {
         this(null, null, success, playerStatus, type, null);
     }
 
-    // Новый: Для ошибок (type + success + errorKey, остальное null)
+    // Для ошибок (type + success + errorKey, остальное null)
     public GameResponse(ResponseType type, String errorKey,  boolean success) {
         this(null, null, success, null, type, errorKey);
     }

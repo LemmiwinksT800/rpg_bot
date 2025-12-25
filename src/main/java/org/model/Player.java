@@ -12,7 +12,7 @@ public class Player {
     private String faction;
     private Map<String, Integer> stats = new HashMap<>();
     private String currentScenarioId = "start";
-
+    private Integer partyId;
 
     public Player(String name) {
         this.name = name;
@@ -25,14 +25,12 @@ public class Player {
         this.inventory = new ArrayList<>();
     }
 
-
     public String getName() { return name; }
     public int getHealth() { return health; }
     public int getMaxHealth() { return maxHealth; }
     public int getLevel() { return level; }
     public List<Item> getInventory() { return Collections.unmodifiableList(inventory); }
     public Map<String, Integer> getStats(){return Collections.unmodifiableMap(stats);}
-
 
     public void setHealth(int health) {
         this.health = Math.max(0, Math.min(health, maxHealth));
@@ -102,4 +100,11 @@ public class Player {
     public String getCurrentScenarioId() { return currentScenarioId; }
     public void setCurrentScenarioId(String currentScenarioId) { this.currentScenarioId = currentScenarioId; }
 
+    public Integer getPartyId() {
+        return partyId;
+    }
+
+    public void setPartyId(Integer partyId) {
+        this.partyId = partyId;
+    }
 }

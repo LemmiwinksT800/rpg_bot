@@ -1,5 +1,4 @@
 package org.logic;
-
 import org.model.*;
 
 import java.util.*;
@@ -7,11 +6,13 @@ import java.util.*;
 public class GameLogic {
     private final PlayerRepository playerRepository;
     private final ScenarioRepository scenarioRepository;
+    private final DatabaseManager dbManager;
     public String currentScenarioId;
 
     public GameLogic(PlayerRepository playerRepository, ScenarioRepository scenarioRepository) {
         this.playerRepository = playerRepository;
         this.scenarioRepository = scenarioRepository;
+        this.dbManager = (DatabaseManager) playerRepository;
         this.currentScenarioId = "start";
     }
 
@@ -37,6 +38,12 @@ public class GameLogic {
 
         if (!player.isAlive()) {
             return new GameResponse(GameResponse.ResponseType.DEAD, false);
+        }
+
+
+        Integer partyId = player.getPartyId();
+        if (partyId != null) {
+            return processPartyInput(playerId, input, partyId);
         }
 
         GameResponse.ResponseType commandType = getCommandType(input);
@@ -72,6 +79,75 @@ public class GameLogic {
         } catch (NumberFormatException e) {
             return buildResponse(scenarioRepository.getScenario(currentScenarioId), player, null, GameResponse.ResponseType.ERROR, "invalid_input");
         }
+    }
+
+    private GameResponse processPartyInput(String playerId, String input, int partyId) {
+        Party party = dbManager.getParty(partyId);
+        if (party == null || !party.getStatus().equals("active")) {
+            return new GameResponse(GameResponse.ResponseType.ERROR, "party_not_active", false);
+        }
+
+        if (!party.getCurrentTurnPlayerId().equals(playerId)) {
+            return new GameResponse(GameResponse.ResponseType.ERROR, "not_your_turn", false);
+        }
+
+        GameResponse.ResponseType commandType = getCommandType(input);
+        if (commandType != null) {
+            return new GameResponse(commandType, true, getPartyStatus(party));
+        }
+
+        Scenario current = scenarioRepository.getScenario(party.getCurrentScenarioId());
+        if (current == null || current.getChoices() == null) {
+            return new GameResponse(GameResponse.ResponseType.END, true);
+        }
+
+        try {
+            int choiceIdx = Integer.parseInt(input) - 1;
+            if (choiceIdx < 0 || choiceIdx >= current.getChoices().size()) {
+                return buildResponse(current, null, null, GameResponse.ResponseType.ERROR, "invalid_choice");
+            }
+
+            Choice choice = current.getChoices().get(choiceIdx);
+
+            for (String pid : party.getPlayerIds()) {
+                Player p = loadPlayer(pid);
+                applyEffect(p, choice.getEffect());
+                if (!p.isAlive()) {
+
+                }
+                playerRepository.savePlayer(pid, p, choice.getNextScenarioId());
+            }
+
+
+            boolean allDead = party.getPlayerIds().stream().allMatch(pid -> !loadPlayer(pid).isAlive());
+            if (allDead) {
+                party.setStatus("ended");
+                dbManager.updateParty(party);
+                return new GameResponse(GameResponse.ResponseType.DEAD, false);
+            }
+
+            // Переходим к следующему игроку
+            int currentIndex = party.getPlayerIds().indexOf(playerId);
+            String nextTurnId = party.getPlayerIds().get((currentIndex + 1) % party.getPlayerIds().size());
+            party.setCurrentTurnPlayerId(nextTurnId);
+            party.setCurrentScenarioId(choice.getNextScenarioId());
+            dbManager.updateParty(party);
+
+            Scenario next = scenarioRepository.getScenario(party.getCurrentScenarioId());
+            return buildResponse(next, null, null, GameResponse.ResponseType.NORMAL);
+
+        } catch (NumberFormatException e) {
+            return buildResponse(scenarioRepository.getScenario(party.getCurrentScenarioId()), null, null, GameResponse.ResponseType.ERROR, "invalid_input");
+        }
+    }
+
+    public String getPartyStatus(Party party) {
+        StringBuilder status = new StringBuilder("Статус партии:\n");
+        for (String pid : party.getPlayerIds()) {
+            Player p = loadPlayer(pid);
+            status.append(p.getStatus()).append("\n");
+        }
+        return status.toString();
     }
 
     private GameResponse.ResponseType getCommandType(String input) {
@@ -138,7 +214,6 @@ public class GameLogic {
     }
 
     public void chooseCampaign(String playerId, String campaignId) {
-        DatabaseManager dbManager = (DatabaseManager) playerRepository;
         Campaign campaign = dbManager.getCampaignById(campaignId);
         if (campaign == null) return;
 
@@ -152,7 +227,7 @@ public class GameLogic {
     }
 
     public List<Campaign> getAllCampaigns() {
-        return ((DatabaseManager) playerRepository).getAllCampaigns();
+        return dbManager.getAllCampaigns();
     }
 
     public void resetForNewCampaign(String playerId) {
@@ -170,5 +245,54 @@ public class GameLogic {
             setCurrentScenarioId("start");
             saveCurrentState(playerId);
         }
+    }
+
+    // Мультиплеерные методы
+    public int createParty(String playerId, String partyName, String campaignId) {
+        Campaign campaign = dbManager.getCampaignById(campaignId);
+        if (campaign == null) return -1;
+        int partyId = dbManager.createParty(partyName, playerId, campaign.getStartScenarioId());
+        if (partyId != -1) {
+            Player player = loadPlayer(playerId);
+            player.setFaction(campaign.getFaction());
+            player.setStats(dbManager.stringToMap(campaign.getStartStats()));
+            player.setCurrentScenarioId(campaign.getStartScenarioId());
+            player.setPartyId(partyId);
+            savePlayer(playerId, player, campaign.getStartScenarioId());
+        }
+        return partyId;
+    }
+
+    private void savePlayer(String playerId, Player player, String currentScenarioId) {
+        playerRepository.savePlayer(playerId, player, currentScenarioId);
+    }
+
+    public void inviteToParty(int partyId, String invitedPlayerId) {
+        dbManager.invitePlayer(partyId, invitedPlayerId);
+    }
+
+    public boolean acceptInvitation(String playerId, int partyId) {
+        dbManager.updateInvitationStatus(partyId, playerId, "accepted");
+        Party party = dbManager.getParty(partyId);
+        if (party != null) {
+            party.addPlayer(playerId);
+            dbManager.updateParty(party);
+            Player player = loadPlayer(playerId);
+            player.setPartyId(partyId);
+            savePlayer(playerId, player, party.getCurrentScenarioId());
+            return true;
+        }
+        return false;
+    }
+
+    public void declineInvitation(String playerId, int partyId) {
+        dbManager.updateInvitationStatus(partyId, playerId, "declined");
+    }
+
+    public GameResponse startPartyGame(int partyId) {
+        Party party = dbManager.getParty(partyId);
+        if (party == null) return new GameResponse(GameResponse.ResponseType.ERROR, "party_not_found", false);
+        Scenario start = scenarioRepository.getScenario(party.getCurrentScenarioId());
+        return buildResponse(start, null, null, GameResponse.ResponseType.NORMAL);
     }
 }
